@@ -18,7 +18,8 @@ Route::middleware('auth:api')->get('/user', function (\Request $request) {
 
 App::singleton('oauth2', function() {
 
-    $storage = new OAuth2\Storage\Pdo(\Illuminate\Support\Facades\DB::connection()->getPdo());
+    //$storage = new OAuth2\Storage\Pdo(\Illuminate\Support\Facades\DB::connection()->getPdo());
+    $storage = new \App\Http\Controllers\CustomPdo(\Illuminate\Support\Facades\DB::connection()->getPdo());
     $server = new OAuth2\Server($storage);
 
     $server->addGrantType(new OAuth2\GrantType\ClientCredentials($storage));
@@ -37,6 +38,7 @@ Route::post('oauth/token', function()
     return $bridgedResponse;
 });
 
+
 Route::get('private', function()
 {
     $bridgedRequest  = OAuth2\HttpFoundationBridge\Request::createFromRequest(\Request::instance());
@@ -45,7 +47,6 @@ Route::get('private', function()
     if (App::make('oauth2')->verifyResourceRequest($bridgedRequest, $bridgedResponse)) {
 
         $token = App::make('oauth2')->getAccessTokenData($bridgedRequest);
-
         return Response::json(array(
             'private' => 'stuff',
             'user_id' => $token['user_id'],
@@ -53,6 +54,25 @@ Route::get('private', function()
             'expires' => $token['expires'],
             'token' => $token,
         ));
+    }
+    else {
+        return Response::json(array(
+            'error' => 'Unauthorized'
+        ), $bridgedResponse->getStatusCode());
+    }
+});
+
+Route::get('userByAcccessToken', function()
+{
+    $bridgedRequest  = OAuth2\HttpFoundationBridge\Request::createFromRequest(\Request::instance());
+    $bridgedResponse = new OAuth2\HttpFoundationBridge\Response();
+
+    if (App::make('oauth2')->verifyResourceRequest($bridgedRequest, $bridgedResponse)) {
+        $token = App::make('oauth2')->getAccessTokenData($bridgedRequest);
+        $profile = \App\Models\Profile::where(['id' => $token['user_id']])->first();
+        return Response::json(
+            $profile->toArray()
+        );
     }
     else {
         return Response::json(array(
